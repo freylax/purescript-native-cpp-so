@@ -2,7 +2,12 @@
 .psci_modules
 bower_components
 node_modules
+.psc-package
+ffi
 
 # Generated files
 .psci
 output
+
+# emacs
+*~

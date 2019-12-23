@@ -1,0 +1,9 @@
+{
+  "name": "purescript-native-cpp-so",
+  "set": "psc-0.13.5",
+  "source": "https://github.com/purescript/package-sets.git",
+  "depends": [
+    "console",
+    "prelude"
+  ]
+}
