@@ -32,7 +32,7 @@
 			   s
 			   )
 		       )
-		     "() -> boxed {\n"
+		     "() -> const boxed& {\n"
 		     "static const boxed _"))
 	    (when (re-search-forward "\\({\\)\\|\\(;[ ]*//.*\\)\\|\\(;\\)" nil t 1)
 	      (cond ((match-beginning 1) ;; matching a {} block
