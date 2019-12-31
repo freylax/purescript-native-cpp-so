@@ -51,15 +51,18 @@ PURESCRIPT_PKG_SRCS=$(foreach d,$(PACKAGE_SOURCES),$(call rwildcard,$(firstword 
 rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
 
 debug: codegen
-	@$(MAKE) $(BIN) CFLAGS+=$(DEBUG) CXXFLAGS+=$(DEBUG)
+	@$(MAKE) $(BIN_DIR)/$(BIN) CFLAGS+=$(DEBUG) CXXFLAGS+=$(DEBUG)
+	@$(MAKE) plugins CFLAGS+=$(DEBUG) CXXFLAGS+=$(DEBUG)
 
 release: codegen
 	@$(MAKE) $(BIN_DIR)/$(BIN) CFLAGS+=$(RELEASE) CXXFLAGS+=$(RELEASE)
+	@$(MAKE) plugins CFLAGS+=$(DEBUG) CXXFLAGS+=$(DEBUG)
 
 .PHONY: corefn
 corefn: PURESCRIPT_SRCS=$(call rwildcard,$(SRC)/,*.purs)
 corefn: $(PURESCRIPT_PKGS)
-	@$(PURS) $(PURSFLAGS) --output $(OUTPUT) $(PURESCRIPT_PKG_SRCS) $(PURESCRIPT_SRCS)
+	@$(PURS) $(PURSFLAGS) --output $(OUTPUT) \
+           $(PURESCRIPT_PKG_SRCS) $(PURESCRIPT_SRCS)
 
 .PHONY: codegen
 codegen: COREFN_SRCS=$(call rwildcard,$(OUTPUT)/,corefn.json)
@@ -75,11 +78,13 @@ PSC_MODULES = $(shell sed -sE -e "s/--.*//g" \
   -ne "0,/module/{s/^[[:space:]]*module[[:space:]]+([A-Za-z.]*).*/\1/p}" $(PURESCRIPT_PKG_SRCS) \
   | sed -e "s/\./_/g" )
 
-APP_MODULES =  # use it for your application specific modules
+PLUGIN_MODULES = Plugin
+APP_MODULES = Posix_Dlfcn
 MAIN_MODULE = Main
 
 PSC_SRCS := $(foreach m,$(PSC_MODULES),$(call rwildcard,$(CC_SRC)/$(m)/,*.cpp)) 
 APP_SRCS := $(foreach m,$(APP_MODULES),$(call rwildcard,$(CC_SRC)/$(m)/,*.cpp))
+PLUGIN_SRCS := $(foreach m,$(PLUGIN_MODULES),$(call rwildcard,$(CC_SRC)/$(m)/,*.cpp))
 FFI_SRCS := $(call rwildcard,$(FFI_SRC)/,*.cpp)
 MAIN_SRCS:= $(call rwildcard,$(CC_SRC)/$(MAIN_MODULE)/,*.cpp)  $(CC_SRC)/purescript.cpp
 
@@ -87,6 +92,7 @@ PSC_OBJS = $(PSC_SRCS:.cpp=.o)
 APP_OBJS = $(APP_SRCS:.cpp=.o)
 FFI_OBJS = $(FFI_SRCS:.cpp=.o)
 MAIN_OBJS= $(MAIN_SRCS:.cpp=.o)
+PLUGIN_OBJS= $(PLUGIN_SRCS:.cpp=.so)
 
 PSC_LIBNAME = psc
 FFI_LIBNAME = psffi
@@ -95,7 +101,8 @@ PSC_LIB = $(BIN_DIR)/lib$(PSC_LIBNAME).so
 FFI_LIB = $(BIN_DIR)/lib$(FFI_LIBNAME).so
 APP_LIB = $(BIN_DIR)/lib$(APP_LIBNAME).so
 
-DEPS  = $(PSC_OBJS:.o=.d) $(APP_OBJS:.o=.d) $(FFI_OBJS:.o=.d) $(MAIN_OBJS:.o=.d)
+DEPS  = $(PSC_OBJS:.o=.d) $(APP_OBJS:.o=.d) $(PLUGIN_OBJS:.so=.d) \
+        $(FFI_OBJS:.o=.d) $(MAIN_OBJS:.o=.d) 
 
 $(PSC_LIB): $(PSC_OBJS)
 	@echo "build shared lib:" $(PSC_LIB)
@@ -105,12 +112,24 @@ $(PSC_LIB): $(PSC_OBJS)
 $(FFI_LIB): $(FFI_OBJS)
 	@echo "build shared lib:" $(FFI_LIB)
 	@mkdir -p $(BIN_DIR)
-	@$(CXX) $^ -o $(FFI_LIB) $(LDSHAREDFLAGS)
+	@$(CXX) $^ -o $(FFI_LIB) $(LDSHAREDFLAGS) 
 
-$(BIN_DIR)/$(BIN): $(MAIN_OBJS) $(PSC_LIB) $(FFI_LIB)
+$(APP_LIB): $(APP_OBJS)
+	@echo "build shared lib:" $(APP_LIB)
+	@mkdir -p $(BIN_DIR)
+	@$(CXX) $^ -o $(APP_LIB) $(LDSHAREDFLAGS)
+
+plugins: $(PLUGIN_OBJS)
+	@echo "copy plugins" $@
+	@mkdir -p $(BIN_DIR)
+	@cp $^ $(BIN_DIR)
+
+$(BIN_DIR)/$(BIN): $(MAIN_OBJS) $(PSC_LIB) $(FFI_LIB) $(APP_LIB)
 	@echo "Linking" $@
 	@mkdir -p $(BIN_DIR)
-	@$(CXX) $(MAIN_OBJS) -o $@ -L$(BIN_DIR)/ -l$(PSC_LIBNAME) -l$(FFI_LIBNAME) $(LDFLAGS)
+	@$(CXX) $(MAIN_OBJS) -o $@ -L$(BIN_DIR)/ \
+                -l$(PSC_LIBNAME) -l$(FFI_LIBNAME) -l$(APP_LIBNAME) \
+                -ldl $(LDFLAGS)
 
 $(BIN_DIR)/$(BIN)_s: $(MAIN_OBJS) $(PSC_OBJS) $(FFI_OBJS)
 	@echo "Linking" $@
@@ -123,12 +142,18 @@ $(BIN_DIR)/$(BIN)_s: $(MAIN_OBJS) $(PSC_OBJS) $(FFI_OBJS)
 	@echo "Creating" $@ "(C++)"
 	@$(CXX) $(CXXFLAGS) $(INCLUDES)  -MMD -MP -c $< -o $@ -fPIC
 
+%.so: %.cpp
+	@echo "Creating" $@ "(C++)"
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -shared -fPIC $< -o $@ 
+
+
 .PHONY: all
 all: release
 
 .PHONY: clean
 clean:
-	@-rm -f $(PSC_LIB) $(PSC_OBJS) $(FFI_LIB) $(FFI_OBJS) $(MAIN_OBJS) $(DEPS)
+	@-rm -f $(PSC_LIB) $(PSC_OBJS) $(FFI_LIB) $(FFI_OBJS)\
+                $(APP_LIB) $(APP_OBJS) $(MAIN_OBJS) $(DEPS)
 	@-rm -rf $(OUTPUT)
 
 .PHONY: run
