@@ -14,6 +14,7 @@ cd
 
 git clone https://git@github.com:freylax/purescript-native.git
 cd purescript-native
+git checkout 5e8c14bc6fdae8f04beaf4493665b1c35188fb7e
 stack install
 
 cd
