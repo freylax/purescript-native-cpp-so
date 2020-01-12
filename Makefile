@@ -34,15 +34,18 @@ cat := $(if $(filter $(OS),Windows_NT),type,cat)
 rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
 # all ffi sources are in ffi dir and src
 FFI_SRCS=$(foreach d,$(wildcard ffi/*),$(wildcard $d/*.cpp)) \
-         $(call rwildcard,src/,*.cpp)
+          $(call rwildcard,src/,*.cpp)
+# purescript transpiled modules
+PCC_SRCS=$(wildcard output/cpp/modules/*.cpp)
+# purescript runtime
+PRT_SRCS=$(wildcard output/cpp/runtime/*.cpp)
+
 # linker options
-FFI_LNKS=$(call rwildcard,src/,*.lnk)
+FFI_LNKS:=$(call rwildcard,src/,*.lnk)
 # modules which are truely needed
-# USED_MOD=$(notdir $(wildcard output/dce/*))
 modules=$(notdir $(wildcard output/$1/*))
 EXEC_MOD=$(call set_create,$(call modules,dce-exec))
 SO_MOD=$(call set_create,$(call modules,dce-so))
-ALL_MOD=$(call set_create,$(call modules,dce))
 # what goes into the libraries
 # in the executable lib goes all what is in the
 # executables without the entry modules
@@ -57,18 +60,19 @@ modtoul=$(foreach m,$(1),$(subst .,_,$(m)))
 # filter out given files $(1) by Modules $(2) 
 filtermod=$(strip $(foreach f,$(1),$(if $(filter $(basename $(notdir $(f))),$(2)),$(f))))
 
-USED_MODLC=$(call modtolc,$(USED_MOD))
-# ffi cpp
-USED_FFI=$(call filtermod,$(FFI_SRCS),$(USED_MODLC))
-# purescript compiled cpp
-USED_PSC=$(foreach m,$(call modtoul,$(USED_MOD)),output/cpp/modules/$(m).cpp)
-USED_CPP=$(USED_FFI) $(USED_PSC) $(wildcard output/cpp/runtime/*.cpp)
-CPP_PSRT=$(wildcard output/cpp/runtime/*.cpp)
+# object files for given modules
+# for one module there can be either an file in PSC_SRCS
+# or in FFI_SRCS or in both
+o_for_mod=$(patsubst %.cpp,%.o,\
+             $(patsubst output/cpp/%,output/obj/%,\
+               $(call filtermod,$(PCC_SRCS),$(call modtoul,$1))) \
+             $(addprefix output/obj/,\
+               $(call filtermod,$(FFI_SRCS),$(call modtolc,$1))) )
 
-# get the cpp files for the given modules
-cpp_for_mod=$(foreach m,$(call modtoul,$1),output/cpp/modules/$m.cpp) \
-            $(call filtermod,$(FFI_SRCS),$(call modtolc,$1))
-o_for_mod=$(patsubst %.cpp,%.o,$(call cpp_for_mod,$1))
+PRT_O=$(patsubst %.cpp,%.o,\
+             $(patsubst output/cpp/%,output/obj/%,$(PRT_SRCS)))
+
+# linker options for modules 
 lnk_for_mod=$(call set_create,\
               $(foreach f,\
                  $(call filtermod,$(FFI_LNKS),$(call modtolc,$1)),$(shell $(cat) $f)))
@@ -100,39 +104,50 @@ codegen:
                      $(DCE_ZEPHYR) \
                      -t 'pscpp output/dce/*/corefn.json'
 
+# include dependicies
+-include $(call rwildcard,output/obj/,*.d)
 
-ALL_OBJ = $(call o_for_mod,$(ALL_MOD)) $(CPP_PSRT:.cpp=.o)
-ALL_DEP = $(ALL_OBJ:.o=.d)
+define ObjectRule
+$2/%.o: $1/%.cpp
+	@echo "Creating" $$@ "(C++)"
+	@mkdir -p $$(dir $$@)
+	@$$(CXX) $$(CXXFLAGS) $$(INCLUDES) -MMD -MP -c -fPIC -o $$@ $$<
+endef
 
--include $(ALL_DEP)
-
-%.o: %.cpp
-	@echo "Creating" $@ "(C++)"
-	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c -fPIC -o $@ $< 
+# the three different soures for objects
+$(eval $(call ObjectRule,output/cpp,output/obj))
+$(eval $(call ObjectRule,ffi,output/obj/ffi))
+$(eval $(call ObjectRule,src,output/obj/src))
 
 EXEC_LIB_NAME = psexec
 SO_LIB_NAME = psso
 EXEC_LIB = $(BIN_DIR)/lib$(EXEC_LIB_NAME).so
 SO_LIB = $(BIN_DIR)/lib$(SO_LIB_NAME).so
 
-$(EXEC_LIB): $(call o_for_mod,$(EXEC_LIB_MOD)) $(CPP_PSRT:.cpp=.o)
-	@echo "build shared lib:" $@
-	@mkdir -p $(BIN_DIR)
-	@$(CXX) $^ -o $@ -shared \
-           $(call lnk_for_mod,$(EXEC_LIB_MOD))
-
-
-define PluginRule
-$(BIN_DIR)/$1.so: $(call o_for_mod,$2)
-	@echo "Creating" $$@ "(C++)"
-	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP \
-           $(call lnk_for_mod,$2) -shared -fPIC -o $$@ $$< 
+define LibRule
+$1: $(call o_for_mod,$2) $3
+	@echo "build shared lib:" $$@
+	@mkdir -p $$(dir $$@)
+	@$(CXX) $$^ -o $$@ -shared \
+           $(call lnk_for_mod,$2)
 endef
 
+$(eval $(call LibRule,$(EXEC_LIB),$(EXEC_LIB_MOD),$(PRT_O)))  
+$(if $(SO_LIB_MOD),$(eval $(call LibRule,$(SO_LIB),$(SO_LIB_MOD),)))
+
+define PluginRule
+$(BIN_DIR)/$1.so: $(call o_for_mod,$2) $(if $(SO_LIB_MOD),$(SO_LIB))
+	@echo "Creating" $$@ "(C++)"
+	@mkdir -p $$(dir $$@)
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP \
+           $(if $(SO_LIB_MOD),-l$(SO_LIB_NAME)) \
+           $(call lnk_for_mod,$2) -shared -fPIC -o $$@ $$< 
+endef
+## $(info $(call PluginRule,plugin,Plugin))
 define ExecutableRule
-$(BIN_DIR)/$1: $(call o_for_mod,$2) $(EXEC_LIB)
+$(BIN_DIR)/$1: $(call o_for_mod,$2) $(EXEC_LIB) 
 	@echo "Linking" $$@ " from " $$^
-	@mkdir -p $(BIN_DIR)
+	@mkdir -p $$(dir $$@)
 	@$(CXX) $$^ -o $$@ -L$(BIN_DIR)/ \
           -l$(EXEC_LIB_NAME) $(LDFLAGS) \
           $(call lnk_for_mod,$2) 
@@ -143,11 +158,14 @@ applyRule=$(foreach k,$(call keys,$1),$(eval $(call $2,$k,$(call get,$1,$k))))
 $(call applyRule,Plugins,PluginRule)
 $(call applyRule,Executables,ExecutableRule)
 
+debug: codegen
+	@$(MAKE) build CXXFLAGS+=$(DEBUG)
+
 define BuildRule
-build: codegen \
-       $(foreach k,$(call keys,Plugins),$(BIN_DIR)/$k.so) \
+build: $(foreach k,$(call keys,Plugins),$(BIN_DIR)/$k.so) \
        $(foreach k,$(call keys,Executables),$(BIN_DIR)/$k) 
 endef
+
 $(eval $(BuildRule))
 
 .PHONY: run-%
@@ -159,5 +177,3 @@ clean-%:
 	@-rm -rf output/$*
 clean:
 	@-rm -rf output
-clean-obj:
-	@-rm -f $(ALL_OBJ) $(ALL_DEP)
