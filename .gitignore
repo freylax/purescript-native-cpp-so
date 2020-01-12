@@ -3,7 +3,6 @@
 bower_components
 node_modules
 .psc-package
-ffi
 
 # Generated files
 .spago
