@@ -6,7 +6,9 @@ Example for creating shared objects with PureScript to C++.
 ```bash
 # Install Git.
 # Install Haskell Stack (https://docs.haskellstack.org/en/stable/README/).
-# Install purescript@0.13 and psc-package
+# Install purescript@0.13
+# Install spago
+# Install zephyr
 
 cd 
 
@@ -14,7 +16,6 @@ cd
 
 git clone https://git@github.com:freylax/purescript-native.git
 cd purescript-native
-git checkout 5e8c14bc6fdae8f04beaf4493665b1c35188fb7e
 stack install
 
 cd
@@ -23,24 +24,19 @@ cd
 
 export PATH="${PATH}:${HOME}/.local/bin"
 
-# Download and install the FFI exports with extern "C" functions.
-
-git clone https://git@github.com:freylax/purescript-native-cpp-ffi.git
-
 # clone this repo
 
 git clone https://git@github.com:freylax/purescript-native-cpp-so.git
 
-# install the ffi
-cp -nr purescript-native-cpp-ffi/. purescript-native-cpp-so/ffi/
-
 cd purescript-native-cpp-so
-# Install the PureScript dependencies.
-psc-package install
 
-# build the example
-make release
+# fetch the ffi and gnumake standard lib
+git submodule init
+git submodule update
+
+# build the main and the plugin
+make build
 
 # run
-make run
+make run-main
 

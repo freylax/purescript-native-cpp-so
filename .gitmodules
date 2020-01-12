@@ -1,0 +1,6 @@
+[submodule "ffi"]
+	path = ffi
+	url = git@github.com:freylax/purescript-native-cpp-ffi.git
+[submodule "gmsl"]
+	path = gmsl
+	url = git@github.com:brulzki/gmsl.git

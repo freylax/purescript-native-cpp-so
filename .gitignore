@@ -6,8 +6,11 @@ node_modules
 ffi
 
 # Generated files
+.spago
 .psci
 output
 
 # emacs
 *~
+*.o
+*.d

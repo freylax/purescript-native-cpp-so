@@ -19,7 +19,7 @@ main :: Effect Unit
 main = catchException printError
    do
      -- open shared object file
-     dlobj <- dlopen "Plugin.so"         
+     dlobj <- dlopen "plugin.so"         
      -- get symbol Plugin.foo
      foo <- dlsym dlobj "Plugin.foo" _StringFct 
      log (foo "Hello")
