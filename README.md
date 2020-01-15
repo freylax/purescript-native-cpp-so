@@ -1,6 +1,33 @@
 # purescript-native-cpp-so
 Example for creating shared objects with PureScript to C++.
 
+The purpose of this repo is the elaboration of the build process
+for a more complex Native C++ Purescript Application.
+We use zephyr to find the module dependencies for the top level
+entry points (applications and plugins). This entry points
+are the only ones one has to specify in the makefile.
+
+There is an plugin loading application (main) and
+an plugin loading server application (server). 
+
+Features:
+	* ffi's are looked up in the ffi or src dir
+		we use the naming convention 'my-module.cpp'
+		for the 'My.Module' purescript module
+	* linker options for ffi's are found in corresponding
+		'my-module.lnk' files
+	* zephyr does dead code elimination so only needed
+		ffi functions are pulled in
+	
+Issues:
+	* zephyr builds all output files anew for every run
+		This would force a rebuild of all the following
+		compilations. We tweak this in the zephyr.bash
+		script, but should be handeld by zephyr.
+		It should give us the list of dependent modules
+		for groups of entry points, we simulate this now by
+		calling it for the plugins and applications separatly.
+
 # How to build?
 
 ```bash
@@ -38,5 +65,14 @@ git submodule update
 make build
 
 # run
+# loading and executing the plugin directly
 make run-main
+# offer a service for loading plugins:
+# in one terminal run
+make run-server
+# in an other on type
+nc localhost 1031
+l plugin 
+c Plugin.add
+c Plugin.add
 

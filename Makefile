@@ -6,6 +6,7 @@ include gmsl/gmsl
 # Executable Entry Modules
 # mapping of executable names to entry modul name
 $(call set,Executables,main,Main)
+$(call set,Executables,server,Server)
 # mapping of plugin names to plugin modul name
 $(call set,Plugins,plugin,Plugin)
 
@@ -77,31 +78,13 @@ lnk_for_mod=$(call set_create,\
               $(foreach f,\
                  $(call filtermod,$(FFI_LNKS),$(call modtolc,$1)),$(shell $(cat) $f)))
 
-# commands passed to spago..
-# set the timestamps of dce/* files to the ones of the coresponding files in purs/*
-DCE_TOUCH=-t '(cd output/dce;for d in *; do touch $$d/corefn.json -r ../purs/$$d/corefn.json; done)'
-# call zephyr $1 are the entry point modules, $2 is the destination dir
-# clear dest dir before
-dce_zephyr=\
-  -t 'rm -fr output/$2/*'\
-  -t 'zephyr $1 -g corefn -i output/purs -o output/$2'
-DCE_ZEPHYR=\
- $(call dce_zephyr,$(EXEC_ENTRY_MOD) $(SO_ENTRY_MOD),dce) $(DCE_TOUCH)\
- $(if $(SO_ENTRY_MOD),\
-    $(call dce_zephyr,$(EXEC_ENTRY_MOD),dce-exec)\
-    $(call dce_zephyr,$(SO_ENTRY_MOD),dce-so)\
-  )
-
 # purs -> corefn -> dead code elimination -> cpp
 #
-# we set the timestamp of the dce files to the ones in purs
-# because these are the logical correct ones, otherwise
-# we would rebuild the generated sources evry time
 .PHONY: codegen
 codegen:
 	@echo "codegen" 
 	@spago build -u '--codegen corefn -o output/purs' \
-                     $(DCE_ZEPHYR) \
+                     -t './zephyr.bash "$(EXEC_ENTRY_MOD)" "$(SO_ENTRY_MOD)"' \
                      -t 'pscpp output/dce/*/corefn.json'
 
 # include dependicies
@@ -140,6 +123,7 @@ $(BIN_DIR)/$1.so: $(call o_for_mod,$2) $(if $(SO_LIB_MOD),$(SO_LIB))
 	@echo "Creating" $$@ "(C++)"
 	@mkdir -p $$(dir $$@)
 	@$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP \
+           -L$(BIN_DIR) \
            $(if $(SO_LIB_MOD),-l$(SO_LIB_NAME)) \
            $(call lnk_for_mod,$2) -shared -fPIC -o $$@ $$< 
 endef
@@ -159,7 +143,7 @@ $(call applyRule,Plugins,PluginRule)
 $(call applyRule,Executables,ExecutableRule)
 
 debug: codegen
-	@$(MAKE) build CXXFLAGS+=$(DEBUG)
+	@$(MAKE) -s build CXXFLAGS+=$(DEBUG)
 
 define BuildRule
 build: $(foreach k,$(call keys,Plugins),$(BIN_DIR)/$k.so) \
