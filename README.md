@@ -10,23 +10,25 @@ are the only ones one has to specify in the makefile.
 There is an plugin loading application (main) and
 an plugin loading server application (server). 
 
-Features:
-	* ffi's are looked up in the ffi or src dir
-		we use the naming convention 'my-module.cpp'
-		for the 'My.Module' purescript module
-	* linker options for ffi's are found in corresponding
-		'my-module.lnk' files
-	* zephyr does dead code elimination so only needed
-		ffi functions are pulled in
+## Features:
+
+* ffi's are looked up in the ffi or src dir.
+	we use the naming convention 'my-module.cpp'
+	for the 'My.Module' purescript module
+* linker options for ffi's are found in corresponding
+	'my-module.lnk' files
+* zephyr does dead code elimination so only needed
+	ffi functions are pulled in
 	
-Issues:
-	* zephyr builds all output files anew for every run
-		This would force a rebuild of all the following
-		compilations. We tweak this in the zephyr.bash
-		script, but should be handeld by zephyr.
-		It should give us the list of dependent modules
-		for groups of entry points, we simulate this now by
-		calling it for the plugins and applications separatly.
+## Issues:
+
+* zephyr builds all output files anew for every run
+	This would force a rebuild of all the following
+	compilations. We tweak this in the zephyr.bash
+	script, but should be handeld by zephyr.
+	It should give us the list of dependent modules
+	for groups of entry points, we simulate this now by
+	calling it for the plugins and applications separatly.
 
 # How to build?
 
