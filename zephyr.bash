@@ -19,12 +19,13 @@ changed=""
 	if [[ ! -e $d/corefn.json ]]; then
 	    rm -fr $d;
 	elif [[ -e $d/old-corefn.json ]]; then
-	    s1=$(stat -c%s $d/old-corefn.json);
-	    s2=$(stat -c%s $d/corefn.json);
-	    if [[ "$s1" -eq "$s2" ]]; then		
-		touch -r $d/old-corefn.json $d/corefn.json;
-	    else
+	    if [[ ../purs/$d/corefn.json -nt $d/old-corefn.json ]]; then
+		#s1=$(stat -c%s $d/old-corefn.json);
+		#s2=$(stat -c%s $d/corefn.json);
+		#if [[ "$s1" -eq "$s2" ]]; then
 		changed="$changed $d";
+	    else
+		touch -r $d/old-corefn.json $d/corefn.json;
 	    fi;
 	fi;
     done;
