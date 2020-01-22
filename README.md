@@ -19,7 +19,8 @@ an plugin loading server application (server).
 	'my-module.lnk' files
 * zephyr does dead code elimination so only needed
 	ffi functions are pulled in
-	
+* Makefile for GNU Make and CMakeLists.txt for CMake	
+
 ## Issues:
 
 * zephyr builds all output files anew for every run
@@ -38,7 +39,7 @@ an plugin loading server application (server).
 # Install purescript@0.13
 # Install spago
 # Install zephyr
-
+# Install cmake / GNU make
 cd 
 
 # Install PureScript Native "extern C" variant (master branch)
@@ -62,8 +63,11 @@ cd purescript-native-cpp-so
 # fetch the ffi and gnumake standard lib
 git submodule init
 git submodule update
+```
+## Using GNU Make
+```bash
 
-# build the main and the plugin
+# build the main and the plugin 
 make build
 
 # run
@@ -77,4 +81,18 @@ nc localhost 1031
 l plugin 
 c Plugin.add
 c Plugin.add
+```
+## Using CMake
+```
 
+# configure the project
+mkdir build
+cd build
+cmake ..
+# build the main and the plugin 
+make 
+# run
+LD_LIBRARY_PATH=. ./main
+# see above
+...
+```

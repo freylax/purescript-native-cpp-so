@@ -8,6 +8,7 @@ node_modules
 .spago
 .psci
 output
+build
 
 # emacs
 *~

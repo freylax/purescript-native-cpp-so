@@ -4,6 +4,18 @@
 # we compare if the size of the corefn file differs,
 # if not we set the timestamp back to the previous build
 # otherwise we would rebuild the generated sources evry time
+# change comma separated list to space separated one
+
+if [[ -n "$1" ]]; then
+    ex="${1//,/$' '}"
+fi;
+if [[ -n "$2" ]]; then
+    so="${2//,/$' '}"
+fi;
+#{
+#  date  
+#  echo "zephyr called with ($ex) and ($so)" 
+#} >> zephyr.log
 
 if [[ -e output/dce ]]; then
     for d in output/dce/*; do
@@ -11,7 +23,7 @@ if [[ -e output/dce ]]; then
     done;
 fi;
 
-zephyr $1 $2 -v -g corefn -i output/purs -o output/dce;
+zephyr $ex $so -v -g corefn -i output/purs -o output/dce;
 changed=""
 (
     cd output/dce;
@@ -34,11 +46,11 @@ if [[ -n "$changed" ]]; then
     echo "zephyr changed modules:";
 fi;
 
-if [[ -n "$2" ]]; then
+if [[ -n "$so" ]]; then
     rm -fr output/dce-exec;
-    zephyr $1 -v -g corefn -i output/purs -o output/dce-exec;
+    zephyr $ex -v -g corefn -i output/purs -o output/dce-exec;
     rm -fr output/dce-so;
-    zephyr $2 -v -g corefn -i output/purs -o output/dce-so;
+    zephyr $so -v -g corefn -i output/purs -o output/dce-so;
 fi;
     
     
