@@ -36,9 +36,9 @@ an plugin loading server application (server).
 ```bash
 # Install Git.
 # Install Haskell Stack (https://docs.haskellstack.org/en/stable/README/).
-# Install purescript@0.13
-# Install spago
-# Install zephyr
+# Install purescript@0.13 (https://github.com/purescript/purescript)
+# Install spago           (https://github.com/spacchetti/spago)
+# Install zephyr          (https://github.com/coot/zephyr)
 # Install cmake / GNU make
 cd 
 
